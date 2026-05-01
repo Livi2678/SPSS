@@ -179,7 +179,7 @@ export function LiteratureSearch() {
   const [picoI, setPicoI] = useState('');
   const [picoC, setPicoC] = useState('');
   const [picoO, setPicoO] = useState('');
-  const [activeDbs, setActiveDbs] = useState<Set<ActiveDB>>(new Set(['pubmed', 'semantic', 'crossref']));
+  const [activeDbs, setActiveDbs] = useState<Set<ActiveDB>>(new Set<ActiveDB>(['pubmed', 'semantic', 'crossref']));
   const [yearFrom, setYearFrom] = useState(2015);
   const [openAccessOnly, setOpenAccessOnly] = useState(false);
   const [selectedStudyTypes, setSelectedStudyTypes] = useState<Set<string>>(new Set());
