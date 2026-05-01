@@ -230,7 +230,11 @@ export function SystematicReview() {
   });
 
   const completeStage = (stage: StageId) => {
-    setCompletedStages((prev) => new Set([...prev, stage]));
+    setCompletedStages((prev) => {
+      const next = new Set(prev);
+      next.add(stage);
+      return next;
+    });
     if (stage < 5) setActiveStage((stage + 1) as StageId);
   };
 
