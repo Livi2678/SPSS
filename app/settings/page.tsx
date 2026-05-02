@@ -2,268 +2,263 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Settings,
-  Key,
-  Eye,
-  EyeOff,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  ExternalLink,
-  Database,
-  Palette,
-} from 'lucide-react';
+import { Settings, Key, Eye, EyeOff, CheckCircle, XCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { useApiKey } from '@/hooks/useApiKey';
 import { useToast } from '@/components/ui/Toast';
+import type { LLMProvider } from '@/lib/providers';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
 };
 
-export default function SettingsPage() {
-  const [newKey, setNewKey] = useState('');
+const PROVIDERS: {
+  id: LLMProvider;
+  name: string;
+  description: string;
+  keyPrefix?: string;
+  keyPlaceholder: string;
+  getKeyUrl: string;
+  freeNote: string;
+  models: { id: string; name: string; note: string }[];
+}[] = [
+  {
+    id: 'anthropic',
+    name: 'Anthropic Claude',
+    description: 'Claude Sonnet 4 — Best for nuanced academic writing and deep analysis',
+    keyPrefix: 'sk-ant-',
+    keyPlaceholder: 'sk-ant-...',
+    getKeyUrl: 'https://console.anthropic.com/keys',
+    freeNote: 'Free tier includes $5 credit — enough for ~100 manuscript evaluations',
+    models: [
+      { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', note: 'Recommended — best balance' },
+      { id: 'claude-opus-4-7', name: 'Claude Opus 4', note: 'Most powerful — slower, higher cost' },
+      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4', note: 'Fastest — lighter analysis' },
+    ],
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI GPT-4o',
+    description: 'GPT-4o — Strong general-purpose research assistant',
+    keyPrefix: 'sk-',
+    keyPlaceholder: 'sk-...',
+    getKeyUrl: 'https://platform.openai.com/api-keys',
+    freeNote: 'New accounts include $5 free credit',
+    models: [
+      { id: 'gpt-4o', name: 'GPT-4o', note: 'Recommended' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', note: 'Faster and cheaper' },
+    ],
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    description: 'Gemini 2.0 Flash — Fast, capable, generous free tier',
+    keyPlaceholder: 'AIza...',
+    getKeyUrl: 'https://aistudio.google.com/app/apikey',
+    freeNote: 'Gemini API has a generous free tier — 15 RPM at no cost',
+    models: [
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', note: 'Recommended — fast & free tier' },
+      { id: 'gemini-2.0-pro', name: 'Gemini 2.0 Pro', note: 'More capable' },
+    ],
+  },
+];
+
+function ProviderCard({ provider }: { provider: typeof PROVIDERS[0] }) {
+  const [key, setKey] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const { key, status, validateKey, enterDemoMode, clearKey } = useApiKey();
+  const [selectedModel, setSelectedModel] = useState(provider.models[0].id);
+  const { validateKey, activeProvider, anthropicKey, openaiKey, geminiKey, enterDemoMode } = useApiKey();
   const { addToast } = useToast();
+  const isValidating = false;
 
-  const handleUpdateKey = async (e: React.FormEvent) => {
+  const currentKey = provider.id === 'anthropic' ? anthropicKey : provider.id === 'openai' ? openaiKey : geminiKey;
+  const isActive = activeProvider === provider.id;
+
+  const handleValidate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newKey.trim()) return;
-    const trimmed = newKey.trim();
-    if (!trimmed.startsWith('sk-ant-')) {
-      addToast({ type: 'error', title: 'Invalid key format', message: 'API keys must start with "sk-ant-"' });
-      return;
-    }
-    const success = await validateKey(trimmed);
+    if (!key.trim()) return;
+    const success = await validateKey(provider.id, key.trim(), selectedModel);
     if (success) {
-      addToast({ type: 'success', title: 'API key updated', message: 'Claude is now connected' });
-      setNewKey('');
+      addToast({ type: 'success', title: `${provider.name} connected`, message: `Now using ${selectedModel}` });
+      setKey('');
     } else {
-      addToast({ type: 'error', title: 'Invalid API key', message: 'Check your key at console.anthropic.com' });
+      addToast({ type: 'error', title: 'Invalid key', message: `Check your key at ${provider.getKeyUrl}` });
     }
   };
 
-  const statusConfig = {
-    connected: { icon: CheckCircle, color: '#0d9e6e', label: 'Connected', message: 'Claude API is active and responding' },
-    demo: { icon: AlertTriangle, color: '#c97d2a', label: 'Demo Mode', message: 'Using pre-written examples — no AI generation' },
-    validating: { icon: RefreshCw, color: '#2d6be4', label: 'Validating...', message: 'Checking API key with Anthropic' },
-    invalid: { icon: XCircle, color: '#c94040', label: 'Invalid', message: 'API key was rejected — please check and re-enter' },
-    idle: { icon: Key, color: '#5a6a80', label: 'Not Set', message: 'No API key has been provided' },
-  };
+  return (
+    <div
+      className="rounded-xl border p-5 transition-colors"
+      style={{
+        backgroundColor: '#111827',
+        borderColor: isActive ? '#c9952a60' : '#1f2d45',
+      }}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-sm font-semibold font-dm text-[#dde4ee]">{provider.name}</h3>
+            {isActive && currentKey && (
+              <span className="text-[10px] px-2 py-0.5 rounded font-bold" style={{ backgroundColor: '#c9952a20', color: '#e8b84b', border: '1px solid #c9952a40' }}>
+                ACTIVE
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-[#5a6a80] font-dm">{provider.description}</p>
+        </div>
+        {currentKey ? (
+          <CheckCircle className="w-5 h-5 text-[#0d9e6e] flex-shrink-0" />
+        ) : (
+          <XCircle className="w-5 h-5 text-[#5a6a80] flex-shrink-0" />
+        )}
+      </div>
 
-  const sc = statusConfig[status];
-  const StatusIcon = sc.icon;
+      {currentKey && (
+        <div className="mb-4 p-2 rounded-lg text-xs font-dm" style={{ backgroundColor: '#0d9e6e15', border: '1px solid #0d9e6e30', color: '#0d9e6e' }}>
+          ✓ Key validated and active. Showing last 4 chars: ···{currentKey.slice(-4)}
+        </div>
+      )}
+
+      <form onSubmit={handleValidate} className="space-y-3">
+        <div className="relative">
+          <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#5a6a80]" />
+          <input
+            type={showKey ? 'text' : 'password'}
+            placeholder={provider.keyPlaceholder}
+            value={key}
+            onChange={e => setKey(e.target.value)}
+            className="w-full pl-9 pr-9 py-2.5 rounded-lg text-sm font-dm text-[#dde4ee] placeholder-[#5a6a80] outline-none"
+            style={{ backgroundColor: '#0d1117', border: '1px solid #1f2d45' }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowKey(!showKey)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a6a80] hover:text-[#8b9ab0]"
+          >
+            {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        <select
+          value={selectedModel}
+          onChange={e => setSelectedModel(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg text-sm font-dm text-[#dde4ee] outline-none"
+          style={{ backgroundColor: '#0d1117', border: '1px solid #1f2d45' }}
+        >
+          {provider.models.map(m => (
+            <option key={m.id} value={m.id}>{m.name} — {m.note}</option>
+          ))}
+        </select>
+
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={!key.trim() || isValidating}
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-dm font-medium transition-all disabled:opacity-40"
+            style={{ backgroundColor: '#c9952a', color: '#07090f' }}
+          >
+            {isValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+            {isValidating ? 'Validating...' : 'Validate & Connect'}
+          </button>
+        </div>
+      </form>
+
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-[11px] text-[#5a6a80] font-dm">{provider.freeNote}</p>
+        <a
+          href={provider.getKeyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[11px] text-[#2d6be4] hover:text-[#5b8ef0] font-dm transition-colors"
+        >
+          Get key <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  const { enterDemoMode, status } = useApiKey();
+  const { addToast } = useToast();
 
   return (
     <motion.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
-      exit="exit"
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="px-8 py-6 max-w-3xl"
+      transition={{ duration: 0.3 }}
+      className="min-h-screen p-10"
+      style={{ backgroundColor: '#07090f' }}
     >
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[#5a6a80]/15 border border-[#5a6a80]/30 flex items-center justify-center">
-            <Settings className="w-4 h-4 text-[#8b9ab0]" />
+      <div className="max-w-[960px] mx-auto space-y-8">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <Settings className="w-5 h-5 text-[#c9952a]" />
+            <span className="text-xs font-dm text-[#5a6a80] uppercase tracking-wider">Configuration</span>
           </div>
-          <h1 className="font-playfair text-2xl font-bold text-[#dde4ee]">Settings</h1>
+          <h1 className="font-playfair text-4xl font-bold text-[#dde4ee] mb-3">Settings</h1>
+          <p className="text-[#8b9ab0] font-dm">Configure your AI provider. All keys are stored in browser memory only — never sent to any server except the AI provider.</p>
         </div>
-        <p className="text-sm text-[#8b9ab0] font-dm">Manage your API key and application preferences.</p>
-      </div>
 
-      <div className="space-y-6">
-        {/* API Key section */}
-        <section className="rounded-xl border border-[#1f2d45] bg-[#0d1117] overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#1f2d45] flex items-center gap-2">
-            <Key className="w-4 h-4 text-[#c9952a]" />
-            <h2 className="font-playfair text-base font-semibold text-[#dde4ee]">Anthropic API Key</h2>
+        {/* AI Provider section */}
+        <section>
+          <h2 className="font-playfair text-xl font-semibold text-[#dde4ee] mb-1">AI Provider</h2>
+          <p className="text-sm text-[#5a6a80] font-dm mb-5">Connect any provider. The app works in Demo Mode without any key — add one to unlock live AI analysis.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {PROVIDERS.map(p => <ProviderCard key={p.id} provider={p} />)}
           </div>
 
-          <div className="px-6 py-5 space-y-4">
-            {/* Current status */}
-            <div
-              className="flex items-center gap-3 p-4 rounded-lg border"
-              style={{ borderColor: sc.color + '30', backgroundColor: sc.color + '08' }}
-            >
-              <StatusIcon
-                className="w-5 h-5 flex-shrink-0"
-                style={{
-                  color: sc.color,
-                  animation: status === 'validating' ? 'spin 1s linear infinite' : undefined,
-                }}
-              />
+          {/* Demo mode */}
+          <div className="rounded-xl border p-5" style={{ backgroundColor: '#111827', borderColor: '#1f2d45' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium font-dm" style={{ color: sc.color }}>
-                  {sc.label}
-                </div>
-                <div className="text-xs text-[#8b9ab0] font-dm">{sc.message}</div>
+                <h3 className="text-sm font-semibold font-dm text-[#dde4ee] mb-1">Demo Mode</h3>
+                <p className="text-xs text-[#5a6a80] font-dm">Use pre-built realistic examples without any API key. Full functionality with sample outputs.</p>
               </div>
-              {(status === 'connected' || status === 'demo' || status === 'invalid') && (
-                <button
-                  onClick={() => {
-                    clearKey();
-                    addToast({ type: 'info', title: 'API key cleared' });
-                  }}
-                  className="ml-auto text-xs text-[#5a6a80] hover:text-[#8b9ab0] font-dm transition-colors"
-                >
-                  Clear
-                </button>
-              )}
+              <button
+                onClick={() => { enterDemoMode(); addToast({ type: 'info', title: 'Demo Mode active', message: 'Using pre-built research examples' }); }}
+                className="px-4 py-2 rounded-lg text-sm font-dm font-medium transition-all"
+                style={{ backgroundColor: status === 'demo' ? '#c9952a20' : '#1f2d45', color: status === 'demo' ? '#e8b84b' : '#8b9ab0', border: status === 'demo' ? '1px solid #c9952a40' : '1px solid #283d5e' }}
+              >
+                {status === 'demo' ? '✓ Active' : 'Use Demo Mode'}
+              </button>
             </div>
-
-            {/* Key preview */}
-            {status === 'connected' && key && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#111827] rounded-lg border border-[#1f2d45]">
-                <Key className="w-3.5 h-3.5 text-[#5a6a80]" />
-                <span className="text-xs font-mono text-[#8b9ab0] flex-1">
-                  {showKey ? key : key.slice(0, 10) + '•'.repeat(20) + key.slice(-4)}
-                </span>
-                <button
-                  onClick={() => setShowKey(!showKey)}
-                  className="text-[#5a6a80] hover:text-[#8b9ab0]"
-                >
-                  {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            )}
-
-            {/* Update key form */}
-            <form onSubmit={handleUpdateKey} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-[#8b9ab0] font-dm mb-1.5">
-                  {status === 'connected' ? 'Update' : 'Enter'} API Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={newKey}
-                    onChange={(e) => setNewKey(e.target.value)}
-                    placeholder="sk-ant-api03-..."
-                    className="w-full bg-[#111827] border border-[#1f2d45] rounded-lg px-3 py-2.5 pr-10 text-sm text-[#dde4ee] font-mono placeholder:text-[#5a6a80] focus:outline-none focus:border-[#c9952a]/60 transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a6a80] hover:text-[#8b9ab0]"
-                  >
-                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={!newKey.trim() || status === 'validating'}
-                  className="px-5 py-2 rounded-lg text-sm font-medium font-dm transition-all disabled:opacity-50"
-                  style={{ backgroundColor: '#c9952a', color: '#07090f' }}
-                >
-                  {status === 'validating' ? 'Validating...' : 'Save & Validate'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    enterDemoMode();
-                    addToast({ type: 'info', title: 'Demo mode activated' });
-                  }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium font-dm border border-[#1f2d45] text-[#8b9ab0] hover:border-[#283d5e] transition-colors"
-                >
-                  Use Demo Mode
-                </button>
-              </div>
-            </form>
-
-            <div className="p-3 rounded-lg bg-[#111827] border border-[#1f2d45] flex items-start gap-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-[#c9952a] flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-[#8b9ab0] font-dm leading-relaxed">
-                <strong className="text-[#dde4ee]">Privacy:</strong> Your API key is stored only in browser memory
-                and is never sent to our servers. It is cleared when you close the browser tab.
-              </div>
-            </div>
-
-            <a
-              href="https://console.anthropic.com/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs text-[#5a6a80] hover:text-[#c9952a] transition-colors font-dm"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Get or manage API keys at console.anthropic.com
-            </a>
           </div>
         </section>
 
-        {/* Database APIs */}
-        <section className="rounded-xl border border-[#1f2d45] bg-[#0d1117] overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#1f2d45] flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#2d6be4]" />
-            <h2 className="font-playfair text-base font-semibold text-[#dde4ee]">Research Database APIs</h2>
-          </div>
-          <div className="px-6 py-5 space-y-3">
+        {/* Privacy note */}
+        <section className="rounded-xl border p-5" style={{ backgroundColor: '#111827', borderColor: '#1f2d45' }}>
+          <h2 className="font-playfair text-lg font-semibold text-[#dde4ee] mb-2">Privacy & Security</h2>
+          <ul className="space-y-2">
             {[
-              {
-                name: 'PubMed E-utilities',
-                status: 'Free — No key required',
-                color: '#2d6be4',
-                note: 'Rate limit: 3 req/s without key, 10 req/s with NCBI API key',
-                link: 'https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/',
-              },
-              {
-                name: 'Semantic Scholar',
-                status: 'Free — No key required',
-                color: '#0d9e6e',
-                note: 'Rate limit: 100 req/5min without key. Optional API key increases limits.',
-                link: 'https://api.semanticscholar.org/',
-              },
-              {
-                name: 'CrossRef',
-                status: 'Free — No key required',
-                color: '#c97d2a',
-                note: 'Polite pool: unlimited with User-Agent email header. Faster with registration.',
-                link: 'https://www.crossref.org/documentation/retrieve-metadata/rest-api/',
-              },
-            ].map((db) => (
-              <div key={db.name} className="flex items-start gap-3 p-3 rounded-lg bg-[#111827] border border-[#1f2d45]">
-                <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: db.color }} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-medium text-[#dde4ee] font-dm">{db.name}</span>
-                    <span className="text-[10px] font-dm px-2 py-0.5 rounded-full" style={{ backgroundColor: db.color + '20', color: db.color }}>
-                      {db.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#5a6a80] font-dm">{db.note}</p>
-                </div>
-                <a href={db.link} target="_blank" rel="noopener noreferrer" className="text-[#5a6a80] hover:text-[#8b9ab0]">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
+              'API keys are stored in browser memory only and are never sent to our servers',
+              'Keys are cleared when you close the browser tab',
+              'Your manuscript text is sent directly to your chosen AI provider — we never store it',
+              'No account required — this tool works entirely client-side',
+            ].map((item, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <CheckCircle className="w-3.5 h-3.5 text-[#0d9e6e] mt-0.5 flex-shrink-0" />
+                <span className="text-xs text-[#8b9ab0] font-dm">{item}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
-        {/* App info */}
-        <section className="rounded-xl border border-[#1f2d45] bg-[#0d1117] overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#1f2d45] flex items-center gap-2">
-            <Palette className="w-4 h-4 text-[#8b9ab0]" />
-            <h2 className="font-playfair text-base font-semibold text-[#dde4ee]">Application</h2>
-          </div>
-          <div className="px-6 py-5 space-y-3">
+        {/* About */}
+        <section className="rounded-xl border p-5" style={{ backgroundColor: '#111827', borderColor: '#1f2d45' }}>
+          <h2 className="font-playfair text-lg font-semibold text-[#dde4ee] mb-3">About ScholarAI Pro</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             {[
-              { label: 'Version', value: '0.1.0' },
-              { label: 'AI Model', value: 'claude-sonnet-4-20250514' },
-              { label: 'Framework', value: 'Next.js 14 (App Router)' },
-              { label: 'Design System', value: 'Deep-Sea Observatory / Oxford Library' },
-              { label: 'Guidelines', value: 'PRISMA, CONSORT, STROBE, STARD, TRIPOD, SPIRIT, CARE, ARRIVE' },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-2 border-b border-[#1f2d45]/50 last:border-0">
-                <span className="text-xs text-[#5a6a80] font-dm">{label}</span>
-                <span className="text-xs text-[#8b9ab0] font-dm font-medium">{value}</span>
+              { label: 'Version', value: '2.0.0' },
+              { label: 'Journals', value: '25+' },
+              { label: 'Study Types', value: '10+' },
+              { label: 'AI Providers', value: '3' },
+            ].map(item => (
+              <div key={item.label} className="p-3 rounded-lg" style={{ backgroundColor: '#0d1117' }}>
+                <div className="text-lg font-bold font-dm text-[#e8b84b]">{item.value}</div>
+                <div className="text-[11px] text-[#5a6a80] font-dm">{item.label}</div>
               </div>
             ))}
           </div>

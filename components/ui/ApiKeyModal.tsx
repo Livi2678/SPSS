@@ -21,16 +21,7 @@ export function ApiKeyModal({ isOpen }: ApiKeyModalProps) {
     if (!inputKey.trim()) return;
 
     const trimmed = inputKey.trim();
-    if (!trimmed.startsWith('sk-ant-')) {
-      addToast({
-        type: 'error',
-        title: 'Invalid key format',
-        message: 'Anthropic API keys start with "sk-ant-"',
-      });
-      return;
-    }
-
-    const success = await validateKey(trimmed);
+    const success = await validateKey('anthropic', trimmed);
     if (success) {
       addToast({
         type: 'success',

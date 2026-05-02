@@ -12,6 +12,8 @@ import {
   Shield,
   Settings,
   Sparkles,
+  BookMarked,
+  Compass,
 } from 'lucide-react';
 import { useApiKey } from '@/hooks/useApiKey';
 import { clsx } from 'clsx';
@@ -23,6 +25,8 @@ const navItems = [
   { href: '/review', label: 'Systematic Review', icon: BookOpen },
   { href: '/analysis', label: 'Analysis', icon: BarChart3 },
   { href: '/guidelines', label: 'Guidelines', icon: Shield },
+  { href: '/journals', label: 'Journal Encyclopedia', icon: BookMarked },
+  { href: '/study-types', label: 'Study Design Hub', icon: Compass },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -158,7 +162,7 @@ export function Sidebar() {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] text-[#5a6a80] font-dm uppercase tracking-wider">Claude API</div>
+            <div className="text-[10px] text-[#5a6a80] font-dm uppercase tracking-wider">AI Provider</div>
             <div className="text-xs font-medium font-dm truncate" style={{ color: statusInfo.color }}>
               {statusInfo.label}
             </div>
